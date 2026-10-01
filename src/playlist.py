@@ -7,7 +7,6 @@ def find_target_playlist(name, playlists):
         if play_name == target_name:
             matching_playlists.append(playlist)
 
-    print(matching_playlists)
     if len(matching_playlists) > 1:
         raise ValueError("More than one matching playlists")
 
