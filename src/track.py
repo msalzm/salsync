@@ -23,6 +23,7 @@ def normalize_spotify_track(track_data):
     norm["title"] = track_data["name"]
     norm["artists"] = [artist["name"] for artist in track_data["artists"]]
     norm["album"] = track_data["album"]["name"]
+    norm["release_year"] = release_year(track_data["album"].get("release_date"))
 
     return norm
 
