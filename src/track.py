@@ -47,6 +47,7 @@ def normalize_youtube_track(track_data):
     norm["title"] = title.strip()
     norm["artists"] = artists
     norm["album"] = track_data.get("album")
+    norm["release_year"] = release_year(track_data.get("release_date"))
 
     return norm
 
