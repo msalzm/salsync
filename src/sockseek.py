@@ -167,7 +167,7 @@ def run_sockseek_from_args(tracks, args, parser):
             output_dir=args.download_dir, config_path=args.sockseek_config,
             executable=args.sockseek_binary, limit=args.limit,
         )
-    except (OSError, ValueError, TaggingError) as error:
+    except (OSError, ValueError, RuntimeError) as error:
         parser.error(str(error))
     except subprocess.CalledProcessError as error:
         parser.exit(1, f"Sockseek exited with code {error.returncode}; see its output above.\n")

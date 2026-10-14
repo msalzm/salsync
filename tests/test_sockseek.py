@@ -13,7 +13,6 @@ from unittest.mock import patch
 
 from mutagen.id3 import ID3
 
-from audio import TaggingError
 from sockseek import download_tracks, search_tracks
 
 
@@ -132,7 +131,7 @@ class SockseekTaggingIntegrationTests(unittest.TestCase):
 
     def test_one_tag_error_is_reported_even_when_other_downloads_succeed(self):
         with patch.dict(os.environ, {"SOCKSEEK_TEST_CORRUPT_ITEM": "1"}):
-            with self.assertRaisesRegex(TaggingError, "Could not tag 1 download"):
+            with self.assertRaisesRegex(RuntimeError, "Could not tag 1 download"):
                 download_tracks([TRACK, {**TRACK, "title": "Second Song"}], **self.options())
         original = self.output / "peer shared track 1.mp3"
         self.assertEqual(original.read_bytes(), b"corrupt MPEG download")
