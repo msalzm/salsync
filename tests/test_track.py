@@ -1,6 +1,6 @@
 import unittest
 
-from src.track import find_match, normalize_spotify_track, tracks_to_add
+from src.track import find_match, normalize_spotify_track, release_year, tracks_to_add
 
 
 class SpotifyTrackTests(unittest.TestCase):
@@ -12,7 +12,7 @@ class SpotifyTrackTests(unittest.TestCase):
                 {"name": "Mira Echo"},
                 {"name": "Abba"},
             ],
-            "album": {"name": "Night Walks"},
+            "album": {"name": "Night Walks", "release_date": "2003-09-29"},
             "external_urls": {
                 "spotify": "https://open.spotify.com/track/sample-001"
             },
@@ -25,9 +25,16 @@ class SpotifyTrackTests(unittest.TestCase):
             "title": "Blue Lights",
             "artists": ["Mira Echo", "Abba"],
             "album": "Night Walks",
+            "release_year": 2003,
         }
 
         self.assertEqual(normalize_spotify_track(raw), expected)
+
+    def test_release_year_accepts_partial_dates_and_leaves_unknown_year_empty(self):
+        for value in ("2003", "2003-09", "2003-09-29"):
+            self.assertEqual(release_year(value), 2003)
+        for value in (None, "", "unknown", "0000", "2003garbage", 2003):
+            self.assertIsNone(release_year(value))
 
 
 class TrackMatchingTests(unittest.TestCase):
@@ -132,4 +139,3 @@ class TracksToAddTests(unittest.TestCase):
 
         self.assertEqual([], tracks_to_add(source, destination))
 
-    
