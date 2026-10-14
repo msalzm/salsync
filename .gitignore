@@ -13,4 +13,5 @@ client_secret_926166421256-0evqgkolp2mg1jtf3ar9ri4onck2u1mh.apps.googleuserconte
 .sockseek.conf
 .discogs-token
 downloads/
-*.md
+*S.md
+*O.md
