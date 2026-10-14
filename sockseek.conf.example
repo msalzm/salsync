@@ -1,0 +1,4 @@
+# Copy to .sockseek.conf, then set SOCKSEEK_CONFIG to that file's absolute path.
+username = your-soulseek-username
+password = your-soulseek-password
+pref-format = mp3
