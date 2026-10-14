@@ -9,7 +9,7 @@ import subprocess
 import sys
 import tempfile
 
-from audio import TaggingError, validate_track
+from audio import validate_track
 
 
 PROJECT_DIR = Path(__file__).resolve().parents[1]
@@ -50,7 +50,7 @@ def report_tagging_results(manifest):
     print(f"Tagged {tagged} MP3 file(s).", flush=True)
     if failed:
         details = "; ".join(f"item {result['item_number']}: {result['error']}" for result in failed)
-        raise TaggingError(f"Could not tag {len(failed)} download(s): {details}. Reports: {manifest.parent}")
+        raise RuntimeError(f"Could not tag {len(failed)} download(s): {details}. Reports: {manifest.parent}")
 
 
 def export_tracks_csv(tracks, csv_path=DEFAULT_CSV):
