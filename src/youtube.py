@@ -1,13 +1,12 @@
-if __package__:
-    from .discogs import find_first_release as find_discogs_release
-    from .llm_title import extract_track_hint
-    from .musicbrainz import find_first_release
-    from .track import normalize_youtube_track
-else:
-    from discogs import find_first_release as find_discogs_release
-    from llm_title import extract_track_hint
-    from musicbrainz import find_first_release
-    from track import normalize_youtube_track
+import logging
+
+from discogs import find_first_release as find_discogs_release
+from llm_title import extract_track_hint
+from musicbrainz import find_first_release
+from track import normalize_youtube_track
+
+
+logger = logging.getLogger(__name__)
 
 
 def get_youtube_playlists(youtube):
@@ -58,8 +57,10 @@ def get_tracks_from_playlist(youtube, playlist_id):
             title = hint.get("title")
             artist = hint.get("artist")
             if not isinstance(title, str) or not title.strip():
+                logger.warning("Skipped %s: could not extract title from video text", video_title)
                 continue
             if not isinstance(artist, str) or not artist.strip():
+                logger.warning("Skipped %s: could not extract artist from video text", video_title)
                 continue
 
             metadata = find_first_release(title.strip(), artist.strip())
@@ -71,6 +72,7 @@ def get_tracks_from_playlist(youtube, playlist_id):
                 "title": metadata.get("title") or title.strip(),
                 "artists": metadata.get("artists") or [artist.strip()],
                 "album": metadata.get("album"),
+                "release_date": metadata.get("release_date"),
             }
             norm_track = normalize_youtube_track(track_data)
             if norm_track is not None:

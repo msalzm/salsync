@@ -1,3 +1,15 @@
+from pathlib import Path
+import re
+
+
+def release_year(value):
+    """Keep the year from a complete or partial release date, if known."""
+    if not isinstance(value, str) or not re.fullmatch(r"[0-9]{4}(?:-[0-9]{2}){0,2}", value):
+        return None
+    year = int(value[:4])
+    return year if year > 0 else None
+
+
 def normalize_spotify_track(track_data):
     """
     Normalize track data

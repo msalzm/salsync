@@ -1,12 +1,27 @@
 # src/discogs.py
 from collections import defaultdict
 import os
+from pathlib import Path
 import re
 
 import requests
 
 
 BASE_URL = "https://api.discogs.com"
+TOKEN_FILE = Path(__file__).resolve().parents[1] / ".discogs-token"
+
+
+def get_discogs_token():
+    """Use the environment token, falling back to the project's local token file."""
+    token = (os.environ.get("DISCOGS_TOKEN") or "").strip()
+    if not token:
+        try:
+            token = TOKEN_FILE.read_text(encoding="utf-8").strip()
+        except FileNotFoundError:
+            pass
+    if not token:
+        raise KeyError(f"Set DISCOGS_TOKEN or put your Discogs token in {TOKEN_FILE}")
+    return token
 
 
 def normalized(text):
@@ -17,13 +32,13 @@ def artist_name(artist):
     return re.sub(r" \(\d+\)$", "", artist.get("anv") or artist.get("name", "")).strip()
 
 
-def matches_artist(artists, artist_name):
+def matches_artist(artists, requested_artist):
     names = [artist_name(artist) for artist in artists]
     names.extend(re.sub(r" \(\d+\)$", "", artist.get("name", "")) for artist in artists)
     joined = " ".join(
         f"{artist_name(artist)} {artist.get('join', '')}".strip() for artist in artists
     )
-    return normalized(artist_name) in {normalized(name) for name in names + [joined]}
+    return normalized(requested_artist) in {normalized(name) for name in names + [joined]}
 
 
 def search_results(session, song_title, artist_name):
@@ -45,7 +60,7 @@ def search_results(session, song_title, artist_name):
 
 
 def search_discogs(song_title, artist_name):
-    token = os.environ["DISCOGS_TOKEN"]
+    token = get_discogs_token()
 
     session = requests.Session()
     session.headers.update({
@@ -119,8 +134,8 @@ def search_discogs(song_title, artist_name):
     )
 
 
-def find_first_release(song_title, artist_name):
-    matches = search_discogs(song_title, artist_name)
+def find_first_release(song_title, requested_artist):
+    matches = search_discogs(song_title, requested_artist)
     candidates = []
     for group in matches:
         for edition in group["editions"]:
