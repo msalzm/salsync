@@ -78,12 +78,5 @@ def main():
         parser.error(f"Playlist not found: {args.playlist}")
 
 
-import cProfile
-import pstats
-
 if __name__ == "__main__":
-    profiler = cProfile.Profile()
-    profiler.runcall(main)
-
-    with open("profile.txt", "w") as report:
-        pstats.Stats(profiler, stream=report).sort_stats("cumtime").print_stats()
+    main()
