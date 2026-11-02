@@ -51,6 +51,20 @@ def normalize_youtube_track(track_data):
 
     return norm
 
+def normalize_folder_track(track_data):
+    """Format filename-derived metadata without opening the MP3."""
+    path = Path(track_data["path"]).expanduser().resolve()
+    return {
+        "service": "local",
+        "url": path.as_uri(),
+        "service_id": str(path),
+        "title": track_data["title"].strip(),
+        "artists": track_data["artists"],
+        "album": track_data.get("album"),
+        "release_year": release_year(track_data.get("release_date")),
+    }
+
+
 def find_match(track, candidates):
     track_title = track["title"].strip().casefold()
     track_names = {name.strip().casefold() for name in track["artists"]}

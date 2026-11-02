@@ -53,7 +53,10 @@ def get_tracks_from_playlist(youtube, playlist_id):
             if not video_id or not video_title or video_title in {"Private video", "Deleted video"}:
                 continue
 
-            hint = extract_track_hint(video_title, snippet.get("videoOwnerChannelTitle", ""))
+            hint = extract_track_hint(
+                video_title, snippet.get("videoOwnerChannelTitle", "") or "",
+                description=snippet.get("description", "") or "",
+            )
             title = hint.get("title")
             artist = hint.get("artist")
             if not isinstance(title, str) or not title.strip():

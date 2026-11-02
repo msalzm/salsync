@@ -100,10 +100,37 @@ class YouTubePlaylistTests(unittest.TestCase):
         self.items.list.assert_called_once_with(
             part="snippet,contentDetails", maxResults=50, playlistId="playlist-1",
         )
-        self.extract.assert_called_with("Dido - White Flag (Official Video)", "Dido Official")
+        self.extract.assert_called_with(
+            "Dido - White Flag (Official Video)", "Dido Official", description="",
+        )
         self.lookup.assert_called_with("White Flag", "Dido")
         self.assertEqual(self.extract.call_count, 2)
         self.discogs_lookup.assert_not_called()
+
+    def test_video_description_and_owner_channel_reach_the_llm(self):
+        from llm_title import extract_track_hint
+
+        self.extract.side_effect = extract_track_hint
+        description = "Artist: Dido\nTrack: White Flag"
+        self.first_request.execute.return_value = {"items": [{
+            **playlist_item(),
+            "snippet": {
+                "title": "White Flag", "description": description,
+                "videoOwnerChannelTitle": "Dido - Topic",
+                "channelTitle": "Playlist Curator",
+            },
+        }]}
+        response = Mock()
+        response.message.content = '{"artist": "Dido", "title": "White Flag"}'
+        with patch("llm_title.chat", return_value=response) as chat:
+            tracks = get_tracks_from_playlist(self.youtube, "playlist-1")
+        chat.assert_called_once()
+        self.assertEqual(chat.call_args.kwargs["messages"][1]["content"], (
+            "Video title: White Flag\nChannel name: Dido - Topic\n"
+            f"Video description: {description}"
+        ))
+        self.lookup.assert_called_once_with("White Flag", "Dido")
+        self.assertEqual(tracks[0]["artists"], ["Dido"])
 
     def test_missing_metadata_preserves_track(self):
         self.lookup.return_value = None

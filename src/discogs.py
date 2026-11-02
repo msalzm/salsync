@@ -1,14 +1,57 @@
 # src/discogs.py
 from collections import defaultdict
+from datetime import timezone
+from email.utils import parsedate_to_datetime
+import logging
 import os
 from pathlib import Path
 import re
+import time
 
 import requests
 
 
 BASE_URL = "https://api.discogs.com"
 TOKEN_FILE = Path(__file__).resolve().parents[1] / ".discogs-token"
+logger = logging.getLogger(__name__)
+
+
+def request_discogs(
+    session: requests.Session,
+    url: str,
+    *,
+    params: dict | None = None,
+    max_retries: int = 3,
+) -> requests.Response:
+    
+    if type(max_retries) is not int or max_retries < 0:
+        raise ValueError("max_retries must be a nonnegative integer")
+
+    for attempt in range(max_retries + 1):
+        response = session.get(url, params=params, timeout=20)
+        if response.status_code != 429 or attempt == max_retries:
+            response.raise_for_status()
+            return response
+
+        delay = 60 * 2 ** attempt
+        retry_after = response.headers.get("Retry-After", "").strip()
+        if retry_after.isascii() and retry_after.isdigit():
+            delay = int(retry_after)
+        elif retry_after:
+            try:
+                retry_at = parsedate_to_datetime(retry_after)
+                if retry_at.tzinfo is None:
+                    retry_at = retry_at.replace(tzinfo=timezone.utc)
+                delay = max(0, retry_at.timestamp() - time.time())
+            except (ValueError, TypeError, OverflowError):
+                pass
+
+        logger.warning(
+            "Discogs rate limit reached; retrying in %.1f seconds (%s/%s).",
+            delay, attempt + 1, max_retries,
+        )
+        response.close()
+        time.sleep(delay)
 
 
 def get_discogs_token():
@@ -44,13 +87,12 @@ def matches_artist(artists, requested_artist):
 def search_results(session, song_title, artist_name):
     page = 1
     while True:
-        response = session.get(
+        response = request_discogs(
+            session,
             f"{BASE_URL}/database/search",
             params={"track": song_title, "artist": artist_name, "type": "release",
                     "per_page": 25, "page": page},
-            timeout=20,
         )
-        response.raise_for_status()
         data = response.json()
         results = data.get("results", [])
         yield from results
@@ -71,11 +113,10 @@ def search_discogs(song_title, artist_name):
     groups = defaultdict(list)
 
     for result in search_results(session, song_title, artist_name):
-        release_response = session.get(
+        release_response = request_discogs(
+            session,
             f"{BASE_URL}/releases/{result['id']}",
-            timeout=20,
         )
-        release_response.raise_for_status()
         release = release_response.json()
 
         matching_tracks = [

@@ -1,16 +1,22 @@
 from pathlib import Path
 import tempfile
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 import requests
 
-from src.discogs import find_first_release, get_discogs_token
+from src.discogs import find_first_release, get_discogs_token, request_discogs
 
 
-def response(data):
+def response(data, status_code=200, headers=None):
     result = Mock()
+    result.status_code = status_code
+    result.headers = headers or {}
     result.json.return_value = data
+    if status_code >= 400:
+        result.raise_for_status.side_effect = requests.HTTPError(
+            f"Discogs HTTP {status_code}", response=result,
+        )
     return result
 
 
@@ -28,6 +34,101 @@ def release(release_id, year=2003, title="Life for Rent", descriptions=("Album",
 
 def search_page(ids, pages=1):
     return {"results": [{"id": value} for value in ids], "pagination": {"pages": pages}}
+
+
+class DiscogsRequestTests(unittest.TestCase):
+    def setUp(self):
+        self.session = Mock()
+        self.url = "https://api.discogs.com/database/search"
+        sleep_patch = patch("src.discogs.time.sleep")
+        self.sleep = sleep_patch.start()
+        self.addCleanup(sleep_patch.stop)
+        log_patch = patch("src.discogs.logger.warning")
+        self.warning = log_patch.start()
+        self.addCleanup(log_patch.stop)
+
+    def test_success_returns_without_waiting(self):
+        success = response({})
+        self.session.get.return_value = success
+        params = {"track": "White Flag", "page": 2}
+        self.assertIs(request_discogs(self.session, self.url, params=params), success)
+        self.session.get.assert_called_once_with(self.url, params=params, timeout=20)
+        self.sleep.assert_not_called()
+
+    def test_rate_limit_honors_retry_after_and_repeats_same_request(self):
+        limited = response({}, 429, {"Retry-After": " 7 "})
+        success = response({})
+        self.session.get.side_effect = [limited, success]
+        params = {"track": "White Flag", "page": 2}
+        self.assertIs(request_discogs(self.session, self.url, params=params), success)
+        self.assertEqual(self.session.get.call_args_list, [
+            call(self.url, params=params, timeout=20),
+            call(self.url, params=params, timeout=20),
+        ])
+        self.sleep.assert_called_once_with(7)
+        limited.close.assert_called_once()
+        self.warning.assert_called_once()
+
+    def test_retry_after_accepts_http_dates_and_past_dates(self):
+        for timestamp, expected in ((100, 20), (130, 0)):
+            with self.subTest(timestamp=timestamp):
+                self.sleep.reset_mock()
+                self.session.get.side_effect = [
+                    response({}, 429, {"Retry-After": "Thu, 01 Jan 1970 00:02:00 GMT"}),
+                    response({}),
+                ]
+                with patch("src.discogs.time.time", return_value=timestamp):
+                    request_discogs(self.session, self.url)
+                self.sleep.assert_called_once_with(expected)
+
+    def test_missing_or_invalid_retry_after_uses_backoff(self):
+        for headers in ({}, {"Retry-After": ""}, {"Retry-After": "invalid"},
+                        {"Retry-After": "-5"}, {"Retry-After": "NaN"}):
+            with self.subTest(headers=headers):
+                self.sleep.reset_mock()
+                self.session.get.side_effect = [response({}, 429, headers), response({})]
+                request_discogs(self.session, self.url)
+                self.sleep.assert_called_once_with(60)
+
+    def test_repeated_rate_limits_stop_after_three_retries(self):
+        limited = response({}, 429)
+        self.session.get.return_value = limited
+        with self.assertRaises(requests.HTTPError) as caught:
+            request_discogs(self.session, self.url)
+        self.assertIs(caught.exception.response, limited)
+        self.assertEqual(self.session.get.call_count, 4)
+        self.assertEqual(self.sleep.call_args_list, [call(60), call(120), call(240)])
+
+    def test_zero_retries_raises_immediately(self):
+        self.session.get.return_value = response({}, 429)
+        with self.assertRaises(requests.HTTPError):
+            request_discogs(self.session, self.url, max_retries=0)
+        self.session.get.assert_called_once()
+        self.sleep.assert_not_called()
+
+    def test_other_http_errors_are_not_retried(self):
+        for status in (400, 401, 403, 404, 500):
+            with self.subTest(status=status):
+                self.session.get.reset_mock()
+                self.session.get.return_value = response({}, status)
+                with self.assertRaises(requests.HTTPError):
+                    request_discogs(self.session, self.url)
+                self.session.get.assert_called_once()
+                self.sleep.assert_not_called()
+
+    def test_connection_failures_are_not_retried(self):
+        self.session.get.side_effect = requests.Timeout("Discogs timed out")
+        with self.assertRaises(requests.Timeout):
+            request_discogs(self.session, self.url)
+        self.session.get.assert_called_once()
+        self.sleep.assert_not_called()
+
+    def test_invalid_retry_counts_are_rejected_before_request(self):
+        for count in (-1, True, 1.5, None):
+            with self.subTest(count=count), self.assertRaises(ValueError):
+                request_discogs(self.session, self.url, max_retries=count)
+        self.session.get.assert_not_called()
+        self.sleep.assert_not_called()
 
 
 class DiscogsTokenTests(unittest.TestCase):
@@ -153,6 +254,23 @@ class DiscogsReleaseTests(unittest.TestCase):
 
     def test_returns_none_for_empty_search(self):
         self.assertIsNone(self.lookup([]))
+
+    def test_search_and_release_requests_both_recover_from_rate_limits(self):
+        self.session.get.side_effect = [
+            response({}, 429, {"Retry-After": "2"}),
+            response(search_page([1])),
+            response({}, 429, {"Retry-After": "3"}),
+            response(release(1)),
+        ]
+        with patch("src.discogs.time.sleep") as sleep, \
+                self.assertLogs("src.discogs", level="WARNING"):
+            result = find_first_release("White Flag", "Dido")
+        self.assertEqual(result["release_id"], 1)
+        self.assertEqual(sleep.call_args_list, [call(2), call(3)])
+        calls = self.session.get.call_args_list
+        self.assertEqual(calls[0], calls[1])
+        self.assertEqual(calls[2], calls[3])
+        self.assertEqual(calls[2].args[0], "https://api.discogs.com/releases/1")
 
     def test_http_errors_propagate(self):
         failed = response({})

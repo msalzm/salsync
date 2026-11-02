@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="app-token" content="__APP_TOKEN__">
+  <title>Salsync · Your music, collected</title>
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <main>
+    <header><a class="brand" href="/" aria-label="Salsync home"><span class="mark">s</span>salsync<span class="badge">LOCAL</span></a><span class="header-note">Your music, collected.</span></header>
+    <section class="intro"><p class="eyebrow">FROM PLAYLIST TO COLLECTION</p><h1>Bring your music home.</h1><p>Find the original release. Keep the tracks you love.</p></section>
+    <section class="source-card" aria-label="Import music">
+      <div class="tabs" role="tablist" aria-label="Music source">
+        <button role="tab" aria-selected="true" data-source="youtube">YouTube</button>
+        <button role="tab" aria-selected="false" data-source="spotify">Spotify</button>
+        <button role="tab" aria-selected="false" data-source="folder">Local folder</button>
+      </div>
+      <div class="source-controls" id="playlist-controls">
+        <button id="connect" class="secondary">Connect &amp; find playlists</button>
+        <label class="grow">PLAYLIST<select id="playlist" disabled><option value="">Connect to choose a playlist</option></select></label>
+        <button id="normalize" class="primary" disabled>Load tracks <span aria-hidden="true">↗</span></button>
+      </div>
+      <div class="source-controls" id="folder-controls" hidden>
+        <label class="grow">FOLDER PATH<input id="folder" placeholder="/Users/you/Music" autocomplete="off"></label>
+        <label class="check-label"><input type="checkbox" id="recursive"> Include subfolders</label>
+        <button id="scan" class="primary">Load tracks <span aria-hidden="true">↗</span></button>
+      </div>
+      <p class="hint" id="source-hint">Connect your account, then choose a playlist. Sign-in opens in your browser if needed.</p>
+    </section>
+    <section class="collection" aria-label="Normalized tracks">
+      <div class="collection-heading"><div><p class="eyebrow">YOUR COLLECTION</p><h2>Tracks <span id="track-count">0</span></h2></div><div class="actions"><span id="selection-count">0 selected</span><button class="secondary" id="organize" hidden disabled>Tag &amp; rename files</button><button class="secondary" id="search" disabled>Search Soulseek</button><button class="primary" id="download" disabled>Download MP3s <span aria-hidden="true">↓</span></button></div></div>
+      <p id="message" role="status" aria-live="polite"></p>
+      <div class="table-wrap"><table><thead><tr><th class="select-cell"><input id="select-all" type="checkbox" aria-label="Select all tracks" disabled></th><th>TRACK / ARTIST</th><th>RELEASE</th><th>YEAR</th><th>LISTEN</th></tr></thead><tbody id="tracks"></tbody></table>
+        <div id="empty"><span class="empty-icon" aria-hidden="true">♫</span><h3>A home for your next favorite.</h3><p>Load a playlist or a folder to start your collection.</p></div>
+      </div>
+      <p class="hint">Downloads receive artist, title, album and year tags. Loading a folder leaves its files untouched until you choose Tag &amp; rename.</p>
+    </section>
+    <section class="bottom-grid">
+      <details class="panel"><summary>Download settings <span aria-hidden="true">+</span></summary><div class="settings"><label>SOCKSEEK EXECUTABLE<input id="binary" placeholder="sockseek on PATH"></label><label>SOCKSEEK CONFIG<input id="config" placeholder="Default Sockseek configuration"></label><label>DOWNLOAD FOLDER<input id="output_dir"></label><p class="hint">Uses your existing configuration and credentials.</p></div></details>
+      <details class="panel" id="activity"><summary><span>Activity <span id="status" class="status">Ready</span></span><span aria-hidden="true">+</span></summary><pre id="logs" aria-live="off">No tasks yet.</pre></details>
+    </section>
+    <footer><span>Stored on your device. Played your way.</span><span>SALSYNC / 01</span></footer>
+  </main>
+  <script id="defaults" type="application/json">__DEFAULTS__</script>
+  <script src="/app.js"></script>
+</body>
+</html>
